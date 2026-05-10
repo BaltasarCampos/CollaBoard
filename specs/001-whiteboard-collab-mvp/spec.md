@@ -182,8 +182,8 @@ stroke. Confirm it is removed.
 - What happens on a mobile device with a touch screen? → Pointer events MUST
   handle `touchstart`, `touchmove`, `touchend` equivalently to mouse events;
   the canvas MUST be touch-scrollable when no tool is active.
-- What happens when the browser tab is hidden (Page Visibility API)? → Cursor
-  events MUST be suspended when the tab is hidden to avoid unnecessary payload.
+- What happens when the browser tab is hidden (Page Visibility API)? → Drawing
+  input MUST be suspended when the tab is hidden to avoid unnecessary payload.
 - What happens when a stroke `operationId` is replayed (retry)? → The server
   deduplicates by `operationId`; the client discards self-originated events
   received via broadcast.
@@ -227,7 +227,10 @@ stroke. Confirm it is removed.
 - **FR-012**: The system MUST validate that the username field is non-empty and
   non-whitespace before allowing form submission.
 - **FR-013**: When a room code is not provided, the system MUST automatically
-  generate a unique room identifier and create a new room.
+  generate a unique room identifier and create a new room. If the generated
+  code collides with an existing room the server MUST retry generation
+  silently (up to 10 attempts); if all 10 attempts collide the server MUST
+  respond with a 500 error.
 - **FR-014**: When a provided room code does not correspond to an existing room,
   the system MUST create a new room with that code and place the user inside it.
 
@@ -239,11 +242,14 @@ stroke. Confirm it is removed.
 
 #### Undo
 
-- **FR-016**: The system MUST support per-user undo of the most recent committed
-  stroke via `stroke:undo` `{ operationId, strokeId, userId }`.
+- **FR-016**: The system MUST support per-user multi-step undo of the user's
+  own committed strokes in reverse commit order via `stroke:undo`
+  `{ operationId, strokeId, userId }`. Each invocation undoes exactly one
+  stroke; the user may invoke undo repeatedly until their stroke history is
+  exhausted.
 - **FR-017**: Undo MUST only affect strokes owned by the requesting `userId`.
 - **FR-018**: The Undo button/shortcut MUST be disabled when the user has no
-  undoable strokes.
+  remaining undoable strokes.
 
 #### Connection Status
 
@@ -278,6 +284,14 @@ stroke. Confirm it is removed.
 - **FR-031**: Interactive controls MUST meet WCAG 2.1 AA minimum contrast and
   have accessible labels.
 
+#### Observability
+
+- **FR-032**: The server MUST emit structured JSON log lines for the following
+  events: room created, room destroyed, user joined, user left, unhandled
+  server errors. Each log line MUST include a timestamp, event type, and
+  relevant identifiers (roomCode, userId where applicable). No external
+  metrics infrastructure is required for the MVP.
+
 ### Key Entities
 
 - **Room**: Identified by a unique room code. Holds the ordered list
@@ -305,7 +319,7 @@ stroke. Confirm it is removed.
 - **SC-003**: A new user joining a room with 500 existing strokes has the
   full canvas hydrated and ready within 1 000 ms of the socket connecting.
 - **SC-004**: Each individual `stroke:point` Socket.IO message payload is
-  ≤128 bytes; each `cursor:move` payload is ≤64 bytes.
+  ≤128 bytes.
 - **SC-005**: The gzipped client bundle is ≤250 KB; time-to-interactive on a
   simulated 4G connection is ≤3 s.
 - **SC-006**: Replaying the same `stroke:commit` event 10 consecutive times
@@ -346,4 +360,4 @@ stroke. Confirm it is removed.
   as an ordered list of stroke commands, enabling full replay to late joiners and 
   efficient clear operations.
 - No moderation, content filtering, or abuse prevention features are required for MVP.
-
+- Real-time cursor-position sharing between users is out of scope for the MVP.
