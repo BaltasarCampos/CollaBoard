@@ -121,3 +121,9 @@ server/
 ## Complexity Tracking
 
 No Constitution violations require justification for this feature.
+
+**FR-032 logging scope (Constitution §VII)**: Per-event broadcast logging
+(`stroke:point`, `stroke:commit`, etc.) is intentionally excluded from FR-032
+to avoid high-volume log noise at scale. The post-MVP upgrade path is a
+structured log sampler or dedicated telemetry layer. This is a documented
+trade-off, not a Constitution violation.

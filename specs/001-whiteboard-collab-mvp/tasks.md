@@ -34,7 +34,7 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 - [ ] T001 Initialize monorepo root with `package.json` (npm workspaces for `client` and `server`), `.nvmrc` (Node 22), and root `.gitignore`
 - [ ] T002 Initialize `server/package.json` with Express 4.x, Socket.IO Server 4.x, uuid, dotenv as dependencies and Jest, nodemon as devDependencies; add `dev`, `start`, `test`, and `test:watch` npm scripts
 - [ ] T003 [P] Initialize `client/package.json` with React 18, Vite 5.x, Socket.IO Client 4.x as dependencies and Jest, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, @vitejs/plugin-react, Playwright as devDependencies; add `dev`, `build`, `preview`, `test`, `test:watch`, and `test:e2e` npm scripts
-- [ ] T004 [P] Configure Vite with `@vitejs/plugin-react`, dev-server proxy (`/socket.io` → `http://localhost:3001`), and `build.chunkSizeWarningLimit: 250` in `client/vite.config.js`
+- [ ] T004 [P] Configure Vite with `@vitejs/plugin-react`, dev-server proxy (`/socket.io` → `http://localhost:3001`), and `build.chunkSizeWarningLimit: 150` (per-chunk warning; total initial bundle budget ≤250 KB gzipped is enforced by T052) in `client/vite.config.js`
 - [ ] T005 [P] Configure Jest with Node test environment, coverage (`lcov`, `text`), and `testMatch: ['**/tests/unit/**/*.test.js']` in `server/jest.config.js`
 - [ ] T006 [P] Configure Jest with jsdom test environment, `setupFilesAfterFramework: ['@testing-library/jest-dom/extend-expect']`, and module name mapper for static assets in `client/jest.config.js`
 - [ ] T007 Configure Playwright with `baseURL: 'http://localhost:5173'`, `retries: 1`, headless mode, and a `chromium` project in `client/playwright.config.js`
@@ -49,12 +49,12 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T008 [P] Define `EVENT_NAMES` (all Socket.IO event name strings) and `ERROR_CODES` (`ROOM_NOT_FOUND`, `ROOM_GENERATION_FAILED`, `INVALID_USER`, `STROKE_NOT_FOUND`, `STROKE_NOT_OWNED`, `VALIDATION_ERROR`) as frozen constants in `server/utils/constants.js`
-- [ ] T009 [P] Define `EVENT_NAMES` (mirrors server), `PAYLOAD_MAX_BYTES: 128`, `HYDRATE_CHUNK_THRESHOLD_BYTES: 51200`, and `round2(n)` coordinate-truncation helper (`Math.round(n * 100) / 100`) in `client/src/utils/constants.js`
+- [ ] T008 [P] Define `EVENT_NAMES` (all Socket.IO event name strings), `ERROR_CODES` (`ROOM_NOT_FOUND`, `ROOM_GENERATION_FAILED`, `INVALID_USER`, `STROKE_NOT_FOUND`, `STROKE_NOT_OWNED`, `VALIDATION_ERROR`), `DEFAULT_STROKE_COLOR: '#000000'`, and `DEFAULT_STROKE_WIDTH: 3` as frozen constants in `server/utils/constants.js`
+- [ ] T009 [P] Define `EVENT_NAMES` (mirrors server), `PAYLOAD_MAX_BYTES: 128`, `HYDRATE_CHUNK_THRESHOLD_BYTES: 51200`, `DEFAULT_STROKE_COLOR: '#000000'`, `DEFAULT_STROKE_WIDTH: 3`, and `round2(n)` coordinate-truncation helper (`Math.round(n * 100) / 100`) in `client/src/utils/constants.js`
 - [ ] T010 [P] Implement structured JSON logger that emits `{ timestamp, eventType, ...identifiers }` to stdout using `console.log`; export `logger.info`, `logger.warn`, `logger.error` in `server/utils/logger.js`
 - [ ] T011 Write unit tests for `roomService` covering: `createRoom` generates 6-char alphanumeric code and retries on collision (up to 10), `joinRoom` adds user to existing or new room, `addStroke` persists and deduplicates by `operationId`, `eraseStroke` removes by `strokeId` (no-op if absent), `undoStroke` removes LIFO from `user.strokeHistory` and validates ownership, `destroyRoom` removes room when last user leaves; in `server/tests/unit/roomService.test.js`
 - [ ] T012 Implement `roomService.js` with in-memory `Map`-based `Room`/`User` state: `createRoom`, `joinRoom`, `leaveRoom`, `addStroke`, `eraseStroke`, `undoStroke`, `hydrateRoom` (returns ordered strokes for chunking), and `destroyRoom`; all pure functions returning updated state or throwing on validation failure; in `server/src/roomService.js`
-- [ ] T013 Write unit tests for `eventHandlers` verifying that each Socket.IO event (`room:join`, `room:rejoin`, `stroke:point`, `stroke:commit`, `stroke:erase`, `stroke:undo`, `disconnect`) delegates to the corresponding `roomService` function with correct arguments; use mock `socket` and `io` objects; in `server/tests/unit/eventHandlers.test.js`
+- [ ] T013 Write unit tests for `eventHandlers` verifying that each Socket.IO event (`room:join`, `room:rejoin`, `stroke:point`, `stroke:commit`, `stroke:erase`, `stroke:undo`, `disconnect`) delegates to the corresponding `roomService` function with correct arguments; use mock `socket` and `io` objects; **recovery scenario**: `room:rejoin` targeting a room that does not exist (simulating post-restart memory loss) causes `socket.emit('error', { code: 'ROOM_NOT_FOUND' })` and does NOT crash the process (Constitution VIII); in `server/tests/unit/eventHandlers.test.js`
 - [ ] T014 Implement `eventHandlers.js` that registers all Socket.IO event listeners on a given `socket`, calls `roomService` methods, broadcasts results via `io.to(roomCode).emit(...)`, and emits `error` events for validation failures; no business logic in this file; in `server/src/eventHandlers.js`
 - [ ] T015 Bootstrap Express app and Socket.IO server: load `.env` (`PORT`, `CLIENT_ORIGIN`, `HYDRATE_CHUNK_THRESHOLD_BYTES`), configure CORS for `CLIENT_ORIGIN`, attach Socket.IO to the HTTP server, register `eventHandlers` for each connected socket, and start listening; in `server/src/server.js`
 - [ ] T016 Implement singleton Socket.IO client: connect to `VITE_SERVER_URL` (env var), export typed `emit`, `on`, `off`, and `once` wrappers; expose a `connected` getter; do NOT auto-connect — call `socket.connect()` explicitly on landing page submit; in `client/src/services/socket.js`
@@ -81,6 +81,7 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 - [ ] T019 [P] [US1] Implement `LandingPage` component: controlled form with `userName` (required) and `roomCode` (optional) fields, client-side validation (non-empty after trim), inline error message for empty username, responsive layout (375 px–1 920 px), emits `room:join` on submit; in `client/src/components/LandingPage/LandingPage.jsx`
 - [ ] T020 [P] [US1] Implement `useRoom` hook managing state: `{ roomCode, userId, userName, participants, undoStack, pendingQueue, isJoined }`; handle `room:joined`, `room:hydrate`, `room:hydrate:start`, `room:hydrate:chunk`, `room:hydrate:end`, `room:participant_joined`, and `room:participant_left` socket events; expose `joinRoom(userName, roomCode)` and `leaveRoom()` actions; in `client/src/hooks/useRoom.js`
 - [ ] T021 [US1] Implement `WhiteboardRoom` shader component with layout sections: `<canvas>` placeholder (`data-testid="canvas-placeholder"`), toolbar placeholder, participants column placeholder, and connection status placeholder; receives `roomData` prop from `useRoom`; shows room code in header; in `client/src/components/WhiteboardRoom/WhiteboardRoom.jsx`
+- [ ] T022a [P] [US1] Write failing unit tests for `<App>` view switching: assert `<LandingPage>` renders when `useRoom().isJoined === false` and `<WhiteboardRoom>` renders when `useRoom().isJoined === true`; confirm tests FAIL before T022 is implemented; in `client/src/App.test.jsx`
 - [ ] T022 [US1] Create client entry point and view switching: `client/src/main.jsx` (mounts `<App />`); `client/src/App.jsx` renders `<LandingPage>` when not joined or `<WhiteboardRoom>` when joined, driven by `useRoom().isJoined`
 
 **Checkpoint**: User Story 1 is fully functional and independently testable. Two tabs can join the same room; hydrated canvas state is replayed on join.
@@ -132,7 +133,7 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 
 - [ ] T035 [P] [US4] Implement `useConnection` hook: subscribe to socket `connect`, `disconnect`, and `reconnect_attempt` events; derive `status` and `retryCount`; configure Socket.IO client with `reconnectionDelay: 500`, `reconnectionDelayMax: 30000`, `randomizationFactor: 0.2`; expose `reconnect()` for the manual Retry action; in `client/src/hooks/useConnection.js`
 - [ ] T036 [US4] Implement `ConnectionStatus` component: non-intrusive fixed badge (top-right corner, `role="status"`, `aria-live="polite"`); three visual states driven by `status` prop; "Retry" button visible only on `disconnected` state; uses `role` and `aria-label` for WCAG 2.1 AA compliance; in `client/src/components/ConnectionStatus/ConnectionStatus.jsx`
-- [ ] T037 [US4] Implement reconnection flow in `useRoom.js`: on socket `connect` event (after backoff), emit `room:rejoin { userId, roomCode }`, wait for `room:hydrate` (or chunked sequence) to complete, then flush `pendingQueue` in insertion order (re-emit each `{ event, payload }`); clear `pendingQueue` after flush; in `client/src/hooks/useRoom.js`
+- [ ] T037 [US4] Implement reconnection flow in `useRoom.js`: on socket `connect` event (after backoff), emit `room:rejoin { userId, roomCode }`, wait for `room:hydrate` (or chunked sequence) to complete, then flush `pendingQueue` in insertion order (re-emit each `{ event, payload }`); clear `pendingQueue` after flush; **depends on T032** (`pendingQueue` field created in US2); in `client/src/hooks/useRoom.js`
 - [ ] T038 [US4] Integrate `ConnectionStatus` into `WhiteboardRoom`: replace connection status placeholder with `<ConnectionStatus status={connectionStatus} onRetry={reconnect} />`; wire `useConnection` status and `reconnect` action; in `client/src/components/WhiteboardRoom/WhiteboardRoom.jsx`
 
 **Checkpoint**: User Story 4 is fully functional and independently testable. Connection badge reflects real state. Offline strokes flush on reconnect.
@@ -193,6 +194,8 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 - [ ] T050 [P] Write E2E test: reconnection + offline queue flush — Tab A joins and draws, simulates network drop (`page.setOfflineMode(true)`), draws more strokes, restores network, asserts all strokes appear in Tab B within 3 s; in `client/tests/e2e/reconnection.spec.js`
 - [ ] T051 [P] Audit all interactive controls (`ToolButton`, `LandingPage` form inputs, `ConnectionStatus` Retry) for WCAG 2.1 AA: minimum 4.5:1 text contrast, `aria-label` on icon-only buttons, `role="status"` on live regions; fix any violations across affected component files
 - [ ] T052 [P] Validate gzipped client bundle ≤250 KB: run `npm run build`, check Vite output; if over budget add `build.rollupOptions.output.manualChunks` to split `socket.io-client` and React into separate chunks; update `client/vite.config.js` as needed
+- [ ] T055 [P] Write automated payload-size assertion: in `client/tests/unit/payloadSize.test.js`, construct a minimal `stroke:point` event payload `{ operationId, strokeId, x, y }` and assert `JSON.stringify(payload).length <= 128`; validates SC-004 / FR-025
+- [ ] T056 [P] Write automated hydration-time E2E assertion: in `client/tests/e2e/performance.spec.js`, join a room pre-seeded with 500 committed strokes, measure elapsed time from socket connect to receipt of `room:hydrate:end`, and assert elapsed ≤1 000 ms; validates SC-003 / FR-024
 - [ ] T053 [P] Verify FR-032 structured logging coverage: confirm `server/src/eventHandlers.js` and `server/src/roomService.js` emit `logger.info` for `room:created`, `room:destroyed`, `user:joined`, `user:left`; confirm `logger.error` fires for unhandled errors; add any missing log calls
 - [ ] T054 Run full `quickstart.md` validation: `npm install` in both packages, `npm run dev` for server + client, run `npm test` for both packages, run `npm run test:e2e`, manually execute all User Story acceptance scenarios from `spec.md`
 
@@ -206,7 +209,7 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 - **Foundational (Phase 2)**: Depends on Phase 1 completion — **BLOCKS all user stories**
 - **User Stories (Phases 3–7)**: All depend on Phase 2 completion
   - US1 (Phase 3) and US2 (Phase 4) are both P1 and can proceed in parallel once Phase 2 is done
-  - US4 (Phase 5) depends on Phase 2 only; can start once Phase 2 is done
+  - US4 (Phase 5) depends on Phase 2 + US1 (`useRoom.js` must exist before T037 extends it) + T032 (`pendingQueue` created in US2); can start once those are complete
   - US3 (Phase 6) and US5 (Phase 7) depend on Phase 2 only; both are P3 and can proceed in parallel
 - **Polish (Phase 8)**: Depends on all desired user stories being complete; E2E tests require server + client running
 
@@ -216,7 +219,7 @@ description: "Task list for Whiteboard Collaboration MVP implementation"
 |-------|-------|----------|------------|--------------------------|
 | US1 — Room Creation & Joining | 3 | P1 | Phase 2 | US2, US4 |
 | US2 — Real-Time Drawing | 4 | P1 | Phase 2 | US1, US4 |
-| US4 — Connection Status | 5 | P2 | Phase 2 + US1 (useRoom) | US3, US5 |
+| US4 — Connection Status | 5 | P2 | Phase 2 + US1 (useRoom) + T032 (pendingQueue) | US3, US5 |
 | US3 — Participants Panel | 6 | P3 | Phase 2 + US1 | US5 |
 | US5 — Tool Selection | 7 | P3 | Phase 2 + US2 | US3 |
 

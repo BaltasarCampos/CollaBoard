@@ -203,8 +203,9 @@ stroke. Confirm it is removed.
   `stroke:point` event `{ operationId, strokeId, x, y }` to all
   room users.
 - **FR-003**: Receiving clients MUST append each incoming `stroke:point` to the
-  in-progress stroke and render it to the shared canvas layer within one
-  animation frame.
+  in-progress stroke and **begin rendering it within one animation frame of
+  receipt** (≤16 ms after the message is processed from the socket buffer);
+  network delivery latency is governed by FR-023, not this requirement.
 - **FR-004**: On pointer-up, the system MUST emit a `stroke:commit` event
   `{ operationId, strokeId, color, width, points[] }` finalizing the stroke.
   This is the idempotent, durable record of the stroke.
@@ -212,6 +213,8 @@ stroke. Confirm it is removed.
   before broadcasting to the room.
 - **FR-006**: The system MUST support erasing strokes by `strokeId` via an
   `stroke:erase` event; erasing is idempotent.
+
+<!-- FR-007: Reserved — removed during spec review -->
 
 #### Room Management
 
@@ -221,7 +224,7 @@ stroke. Confirm it is removed.
   on join the server MUST send the current committed canvas state
   (`room:hydrate` event).
 - **FR-010**: The server MUST maintain room state in memory; rooms with no 
-  users MUST be inmediatly deleted.
+  users MUST be immediately deleted.
 - **FR-011**: The system MUST provide a landing page with a form containing a 
   mandatory username field and an optional room code field.
 - **FR-012**: The system MUST validate that the username field is non-empty and
@@ -292,6 +295,11 @@ stroke. Confirm it is removed.
   relevant identifiers (roomCode, userId where applicable). No external
   metrics infrastructure is required for the MVP.
 
+- **FR-033**: User-supplied room codes MUST be restricted to alphanumeric
+  characters (A–Z, a–z, 0–9); the server MUST reject any room code containing
+  non-alphanumeric characters with a `VALIDATION_ERROR` response before
+  processing the join request.
+
 ### Key Entities
 
 - **Room**: Identified by a unique room code. Holds the ordered list
@@ -303,25 +311,32 @@ stroke. Confirm it is removed.
 - **User**: A connected socket identified by `userId` and display name.
    Not persisted beyond the active session for MVP.
 - **Operation**: Any mutation of canvas state, identified by `operationId`
-  (UUID v4). Types: `stroke:commit`, `stroke:erase`, `stroke:undo`, `canvas:clear`.
+  (UUID v4). Types: `stroke:commit`, `stroke:erase`, `stroke:undo`.
+  (`canvas:clear` is out of scope for MVP — see Assumptions.)
 
 ---
 
 ## Success Criteria *(mandatory)*
 
+> FRs are the normative source of truth for thresholds. SCs are named
+> validation predicates that reference FRs — if a threshold changes in an FR,
+> the corresponding SC must be updated to match.
+
 ### Measurable Outcomes
 
-- **SC-001**: Local stroke rendering runs at a sustained 60 fps (≤16 ms per
-  frame) on a mid-range device while drawing continuously for 60 seconds.
-- **SC-002**: A second user receives and renders each stroke segment
-  within 150 ms P99 of it being drawn, measured on a simulated 100 ms RTT
-  link.
-- **SC-003**: A new user joining a room with 500 existing strokes has the
-  full canvas hydrated and ready within 1 000 ms of the socket connecting.
-- **SC-004**: Each individual `stroke:point` Socket.IO message payload is
-  ≤128 bytes.
-- **SC-005**: The gzipped client bundle is ≤250 KB; time-to-interactive on a
-  simulated 4G connection is ≤3 s.
+- **SC-001** *(validates FR-022)*: Local stroke rendering runs at a sustained
+  60 fps (≤16 ms per frame) on a mid-range device while drawing continuously
+  for 60 seconds.
+- **SC-002** *(validates FR-023)*: A second user receives and renders each
+  stroke segment within 150 ms P99 of it being drawn, measured on a simulated
+  100 ms RTT link.
+- **SC-003** *(validates FR-024)*: A new user joining a room with 500 existing
+  strokes has the full canvas hydrated and ready within 1 000 ms of the socket
+  connecting.
+- **SC-004** *(validates FR-025)*: Each individual `stroke:point` Socket.IO
+  message payload is ≤128 bytes.
+- **SC-005** *(validates FR-026, FR-027)*: The gzipped client bundle is ≤250 KB;
+  time-to-interactive on a simulated 4G connection is ≤3 s.
 - **SC-006**: Replaying the same `stroke:commit` event 10 consecutive times
   produces an identical canvas state to processing it once.
 - **SC-007**: All committed strokes drawn in a room are visible to a user who
@@ -360,4 +375,6 @@ stroke. Confirm it is removed.
   as an ordered list of stroke commands, enabling full replay to late joiners and 
   efficient clear operations.
 - No moderation, content filtering, or abuse prevention features are required for MVP.
+- Canvas-clear (clearing all canvas content at once via a `canvas:clear` event)
+  is out of scope for the MVP.
 - Real-time cursor-position sharing between users is out of scope for the MVP.
